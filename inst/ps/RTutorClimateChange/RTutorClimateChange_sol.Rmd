@@ -1,0 +1,1554 @@
+
+# Agriculture's Response to Climate Change in the US
+
+Author:  Vera Lang
+
+
+#< ignore
+
+```{r setup}
+library(RTutor)
+# Adapt the working directory below and then run setup chunk in RStudio.
+setwd("C:/Users/Vera/Desktop/Masterthesis/RTutor")
+
+ps.name = "RTutorClimateChange"; sol.file = paste0(ps.name,"_sol.Rmd")
+libs = c("ggplot2","haven","dplyr","maps","fields","lfe","gghighlight","usmap","gridExtra","stargazer", "tidyr") # character vector of all packages you load in the problem set
+
+#name.rmd.chunks(sol.file)
+create.ps(sol.file=sol.file, ps.name=ps.name, libs=libs,addons = "quiz")
+          
+# The following line directly shows the problem set 
+# in the browser
+show.ps(ps.name,launch.browser=TRUE,
+  auto.save.code=FALSE,sample.solution=FALSE)
+
+```
+
+#>
+
+Welcome! You are starting an interactive R-Tutor set which is part of my master's thesis and focuses on farmers adaptation to climate change in corn cultivation in the United States (U.S.). This R-Tutor set is based on the paper *Adaptation to Climate Change: Evidence from US Agriculture* from Marshall Burke & Kyle Emerick published in 2015. The main paper and the data used can be found in the links below: 
+
+
+- `Paper`: https://pubs.aeaweb.org/doi/pdfplus/10.1257/pol.20130025
+
+- `Data`: https://www.openicpsr.org/openicpsr/project/114567/version/V1/view?path=/pcms/projects/1/1/4/5/114567/V1.0.1/replication&type=folder
+
+
+Corn is one of the main crops in the U.S. with currently around 90 million acres of land under cultivation. In 1980 it was mainly used as feed grain for livestock while only a small share was used for human consumption and industrial use. Over time, corn has increasingly been utilized as an ingredient for ethanol production, which accounts for nearly 40% of corn use in 2021. (Economic Research Service (2021))
+The corn plant grows best under moderate climate without frost and extreme heat, but with enough sunshine and is planted mainly in the central states of the U.S. (Saavoss et al. (2021)). Since extreme heat is not beneficial for corn growth and the global temperature has increased in the years 1975-2005 by 0.2°C each decade (Hansen e al. (2006)), the question has to be asked how quickly farmers react to climate change. For this purpose, we will evaluate how variations in temperature and precipitation affect corn. The climate and agricultural data are available for the period 1950-2005, with 1980-2000 being the main observation period in this problem set. During this interactive course, you will get a closer look at the data and will be introduced step by step to the methods used for the data analysis. The structure of the problem set is the following: 
+
+
+## Exercise Content
+
+1. Introduction of the Data
+  
+2. The Linear Regression Model
+
+  2.1 The Piecewise Regression
+  
+  2.2 Addition of Control Variables 
+  
+  2.3 Long Differences
+
+3. Measure for Adaptation
+  
+  3.1 Adaptation in Corn Production
+
+  3.2 Adaptation to other Margins
+
+4. Conclusion
+
+Chapter 1 begins with a brief explanation of the origin of the data and the collection of the climate data. Subsequently the measures of the data are explained in more detail. Then we will get an overview of the data by analyzing how the climate and the corn production has developed over the observation period. In chapter 2 we construct the regression model, as we proceed to estimate the impact of climate change on corn production. We will address the regression results from Chapter 2 again in Chapter 3, to examine whether farmers are responding to climate change. Finally, conclusions and limitations are discussed in part 4.
+
+To solve the problem set with R, it is recommended to work on the exercises in given order. To work on a task, press `edit`. To see if a solution is correct press `check`. For some tasks, the code is completely given. Those tasks only have to be executed with the `check` button. Besides these tasks, there are fill-in tasks where the code is already partly given and tasks that have to be solved entirely by yourself. Next to coding exercises, there are quizzes to solve and infoboxes which contain additional information.
+
+
+## Exercise 1 -- Introduction of the data
+
+We will evaluate in this R-Tutor set climate data and agricultural data. The climate data used are from Schlenker and Roberts (2009) who collected data between 1950-2005 in the U.S. using a satellite with 4 km grid cells. To measure the temperature a 2.5 x 2.5 mile grid was created for the entire land area of the United States and the daily minimum and maximum temperatures of each grid was predicted. The daily duration of temperature was then measured in one Degree Celsius intervals. The grids were matched within a satellite scan to only obtain the temperature data with crop areas in the grid cells. From the daily values, the mean was taken and summarized to annual data for each county. A similar approach was used to measure precipitation. (Schlenker & Roberts (2009)) 
+The agricultural data is available at the county-year level and was provided by the United States Department of Agriculture's National Agricultural Statistics Service (NASS). We will focus on data collected east of the 100th meridian, since these counties account for 93% of all corn produced in the United States.(Burke & Emerick (2015))
+
+
+
+Now we take a look at the climate and agricultural data that we will use in this R-Tutor set. The data can be found in the following panel data set:
+
+  - us_panel.dta
+
+Our first task is to load the data file `us_panel.dta`. By the ending .dta we can already see that this is a Stata file. To load Stata files, we will use the function `read_dta` of the package `haven`. First, we need to load the package `haven` into the function `library`. Then we can use the function `read_dta` to load the data set `us_panel.dta` into the variable `dat`. The code is already written, press `check` to execute it. 
+
+```{r "1 a) 1"}
+#< task
+library(haven)
+dat = read_dta("us_panel.dta")
+#>
+```
+
+To get an overview of the data, call it with the function `head`. This will show you all columns and the first six rows of the data set `dat`.
+
+```{r "1 a) 2"}
+
+head(dat)
+
+```
+
+The data set `dat` has 51 variables with data available yearly per county. The `county` is given as Federal Information Processing Standards, short FIPS code. The FIPS code indicates the state with the first two numbers and the corresponding county with the following numbers. The state name is given in the column `state`. The variable `corn_production` is the yield of corn measured in bushels. The column `log_corn` is the calculated logarithm of `corn_production`. The logarithm was calculated for comparability reasons, since the variable `corn_production` has a wide range of values and varies between 0.3 and 203. The variable `prec` shows the total precipitation per year in cm. The column `corn_area` contains the corn area per county and year in acres. The yearly average temperature per county is stored in the variable `tavg` and is reported in Degree Celsius. The geographical position of a county is indicated with the columns `longitude` and `latitude`. The variable `dday0C` is the total percentage of time where more than 0°C was measured. To obtain `dday0C` for each day the temperature distribution within one day was measured and the percentage where more than 0°C has been measured, was assigned to the variable `dday0C`. These daily percentages were then added up to a total annual value. The same procedure was used for the variable `dday1C` except that, `dday1C` has only the percentage values allocated, with more than 1°C.
+
+
+#< quiz "dday_0C compared to dday_1C"
+
+question: Which variable has a higher total annual value, `dday0C` or `dday1C`?
+
+sc:
+    - dday0C consists of the time where the temperature was higher than 0°C and therefore also includes the time were 1°C and more was measured.  Whereas dday1C only contains the daily percentage of time where the temperature was above 1°C.*
+    - dday1C, since 1°C is a higher temperature than 0°C.
+   
+success: Correct.
+failure: Try again
+#>
+
+
+<p></p>
+<p></p>
+
+
+### Growing Degree Days
+
+We take a closer look now at the variables `dday0C`-`dday40C` on the basis of the exemplary county McLean (FIPS: 17113) in 1980. To limit the data set we make use of the package `dplyr` which contains practical functions to manipulate data frames. We use the function `filter` to filter by our specific county and year of interest. Additionally we use the practical operator `%>%` from `dplyr`,  by which the data on the left is passed to the first function on the right. Which saves us from call each column by first specifying the corresponding data frame by `dat$...`. The code is already given just press `check` to see the first rows of the data set `dday`.
+
+```{r "1 a) 3", warning=FALSE}
+#< task
+library(dplyr)
+
+dday <- dat%>% filter(county==1001 & year ==1980)%>%
+               select(-state,-county,-year,-corn_production,-log_corn,-prec,-corn_area,-tavg,-longitude,-latitude)
+
+head(dday)
+#>
+```
+
+To visualize the values of the variables `dday0C` - `dday40C` in a bar chart, we need to convert the data set `dday` from wide format to long format. For this purpose we use the function `pivot_longer` from the package `tidyr`. 
+
+```{r "1 a) 4", warning=FALSE}
+#< task
+library(tidyr)
+
+dday_plot <- pivot_longer(dday, cols = starts_with("dday"), 
+                          names_to = "degree",
+                          names_pattern="dday(.*)C",
+                          values_to = "time")
+
+head(dday_plot)
+#>
+```
+
+Due to pivoting, the data set now consists of two columns `degree` and `time`. In the next task, we visualize the new data set in a bar chart to better understand the values of the variables `dday0C`-`dday40C`. To create the plot we use the function `ggplot` from the package `ggplot2`. By adding the  function `geom_bar` we indicate that the data should be plotted as a bar chart. Press `check` to visualize the data.
+
+```{r "1 a) 5", warning=FALSE}
+#< task
+library(ggplot2)
+
+dday_plot <- dday_plot%>% mutate(degree = as.numeric(degree))
+
+ggplot(dday_plot, aes(x = degree, y = time))+
+      geom_bar(aes(x = degree, y = time), stat="identity")+
+      scale_fill_gradient2(low = "red", high = "green", mid = "yellow", midpoint = median(dday_plot$time))+
+      geom_col(aes(fill = time))+
+      ggtitle("Growing Degree Days of McLean in 1980")+
+      xlab("Temperature in °C")+
+      ylab("Total Percentage of Time")
+#>
+```
+
+The bar chart shows that the values of the variables `dday0C`-`dday40C` decrease with increasing temperature. Since the variables are only assigned the percentage of time, where more than the temperature given by 0C-40C in the variable name, was measured. In the course of the problem set we will also refer to the variables `dday0C`-`dday40C` as growing degree days.
+
+
+### Trend of Corn Production 
+
+In the next task, we want to map the states that are included in the data frame `dat` by using the package `maps`. The package contains several geographic databases including one for the states in the U.S. The states are visualized by the function `map` by passing the geographical database state to the first parameter of `map`. With `xlim` we narrow the visualization to the states east of the 100th meridian. Press `check` to visualize the states.   
+
+```{r "1 a) 6"}
+#< task
+library(maps)
+
+state_name <-tolower(c(unique(dat$state)))
+state_abb <- c(unique(dat$abb))
+state_legend <- paste(state_abb,c(unique(dat$state)))
+
+map("state", fill=TRUE, col=0, xlim=c(-101,-67))
+map("state",region =state_name, fill=TRUE, col="grey",xlim=c(-101,-67), add=TRUE)
+text(x=state.center$x, y=state.center$y, state.abb,cex=.5)
+legend("topright",inset=c(-0.35,0), legend=c(state_legend),cex=.5, xpd=TRUE,)
+title(main = "All states east of the 100th meridian",cex.main=0.75)
+
+#>
+```
+
+All states highlighted in gray are states which are included in our data set `dat`. In the next two tasks we will discover how the corn production has been evolving over time for each state. To calculate the corn production trend over the years in each state we will group the data with the function `group_by`. We will group by state and year in order to calculate the sum for each group. The function `summarise` creates a new data frame `dat_production` which is reduced to one row for each group. Fill in the missing code to calculate the sum of `corn_production` for each group and save it in the variable `total_production`.
+
+```{r dev="svg"}
+#< fill_in
+#dat_production <- dat%>%
+#                  ___(state,year)%>%
+#                  summarise(total_production = ___(corn_production))
+
+#head(dat_production)
+#>
+
+dat_production <- dat%>%
+                  group_by(state,year)%>%
+                  summarise(total_production = sum(corn_production))
+head(dat_production)
+```
+
+We visualize the total corn production per state and year with `ggplot` as a line plot, for which the function `geom_line` is called. With the `gghighlight` function from the package `gghighlight`, we point out states that have a particularly high or low corn production. Press `check` to plot the line graph.
+
+```{r "1 a) 8"}
+#< task
+library(gghighlight)
+
+dat_production%>%
+  ggplot(aes(x=year, y=total_production, group=state,color=state))+
+  geom_line()+
+  labs(x="Year", y= "Total Corn Production", title="Trend of Corn Production")+
+  gghighlight(max(total_production) > 14200 | min(total_production) < 350)+
+  theme(plot.title = element_text(hjust = 0.5))
+
+#>
+```
+
+Overall, it can be seen that the trend in corn production is positive and over the time more corn has been grown in the United States. The north-central states Iowa, Illinois and Indiana have the largest corn production and Delaware the lowest over time. In contrast to the trend of more corn production, the state West Virginia has reduced the corn production during the observation period.
+
+
+### Overview Temperature and Precipitation
+
+In this section, we get an overview of the evolution of the average temperature and precipitation during the observation period. To avoid an overload of data, we create a category variable `location` for the counties. A new variables can be added to a data frame with the function `mutate`. The assignment to the category is done by the function `case_when`. For more information about the function `case_when`, see in the infobox below.  The possible values of the variable `location` are "north", "center" or "south" which are defined by the `latitude` of the counties. We then group the data frame `climate` by `year` and `location` and calculate for each group the mean of the variables average temperature `tavg` and precipitation `prec`.
+
+#< info "case_when"
+
+The two sides of the `case_when` functions are separated by the operator ~
+- Left side: If condition 
+- Right side: Formula which is executed when the if condition is true
+Additional if-else statements can be added, separated by a comma.
+
+#>
+
+```{r "1 a) 9"}
+#< task
+climate <- dat%>%
+           mutate(location = case_when(
+                             latitude > 40 ~ "north",
+                             latitude < 40 & latitude > 35 ~ "center",
+                             latitude < 35 ~ "south"))%>%
+           group_by(year,location)%>%
+           summarise(prec = mean(prec),
+                     temp = mean(tavg))
+#>
+```
+
+Press `check` to display the aggregated mean values, for temperature and precipitation by location and year, in a line plot.
+
+```{r "1 a) 10",fig.width=10}
+#< task
+library(gridExtra)
+
+plot1 <- climate %>%
+  ggplot(aes(x=year, y=prec, group=location,color=location)) +
+  geom_line()+
+  scale_colour_manual(values = c("darkgreen", "darkblue", "darkorange"))+
+  labs(x="Year", y= "Average Precipitation", title="Precipitation")+
+  theme(legend.position = "none",plot.title = element_text(hjust = 0.5))
+
+plot2<-climate %>%
+  ggplot(aes(x=year, y=temp, group=location,color=location)) +
+  geom_line()+
+  scale_colour_manual(values = c("darkgreen", "darkblue", "darkorange"))+
+  labs(x="Year", y= "Average Temperature", title="Temperature")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+grid.arrange(plot1, plot2, ncol=2)
+#>
+```
+
+In the south, both precipitation and temperature are on average the highest during the observation period. The north has the lowest average temperature and the lowest amount of precipitation with an average of less than 60 cm of precipitation. The counties in the category center receive more rainfall than the north and mostly less than the southern counties. In the center of the U.S. there is an average temperature between 19-21°C, which is warmer than in the northern counties and cooler than in the south.
+
+
+### Temperature and Corn Change between 1980 and 2000
+
+In this section we look how the average temperature and corn production have changed in each county by comparing the year 1980 with the year 2000. To ensure that the years 1980 and 2000 are good representations of weather conditions and corn production at that time, we calculate averages of these years with respectively the periods 1978-1982 and 1998-2002. 
+
+In the next task we calculate the average of the year 1980 and save it in the variable `dat_1980`. First, we restrict the data set to the period 1978-1982 for which we want to calculate the means. We then group the data set by county, and retain only those groups that have a complete set of observations for the 5-year period. Here the function `n` is used, which gives us the current group size for each group. We then average over a 5-year period for `log_corn`, `prec` and `tavg` by taking the `mean`. The results are stored in the data set `dat_1980`.
+
+```{r "1 a) 11"}
+#< task
+dat_1980 <- dat%>% 
+            filter(year >= 1978 & year <= 1982)%>%
+            group_by(county)%>% 
+            mutate(county_count = n())%>% 
+            filter(county_count == 5)%>% 
+            summarise(log_corn  = mean(log_corn),
+                      prec      = mean(prec),
+                      tavg      = mean(tavg))
+
+head(dat_1980)
+#>
+```
+
+We also need the 5-year average in 2000 for precipitation, average temperature, and log corn production. Fill in the missing code to save the results in `dat_2000`.
+
+```{r dev="svg"}
+
+#< fill_in
+#dat_2000 <- dat%>% 
+#            filter(year >= 1998 & year <= 2002)%>%
+#            group_by(county)%>% 
+#            mutate(county_count = n())%>% 
+#            filter(county_count == ___)%>% 
+#            summarise(log_corn  = ___(log_corn),
+#                      prec      = mean(prec),
+#                      tavg      = mean(tavg))
+#>
+
+dat_2000 <- dat%>% 
+            filter(year >= 1998 & year <= 2002)%>%
+            group_by(county)%>% 
+            mutate(county_count = n())%>% 
+            filter(county_count == 5)%>% 
+            summarise(log_corn  = mean(log_corn),
+                      prec      = mean(prec),
+                      tavg      = mean(tavg))
+
+
+```
+
+In the next task, the counties of the data frames `dat_1980` and `dat_2000` are compared and only those counties that appear in both data sets are kept. The code is already given.
+
+```{r "1 a) 12", warning=FALSE}
+#< task
+
+dat_1980 <- dat_1980 %>% filter(county %in% dat_2000$county)
+
+dat_2000 <- dat_2000 %>% filter(county %in% dat_1980$county)
+
+#>
+```
+
+Since both data sets now match the same counties, we can calculate the changes between the two years 1980 and 2000, by taking the difference. The results are stored in `dat_diff`. Press `check` to calculate the differences between 1980 and 2000 and display the data.
+
+```{r "1 a) 13"}
+#< task
+dat_diff <- dat_2000%>%
+                mutate(period   = "1980_2000",
+                       log_corn_diff = log_corn - dat_1980$log_corn,
+                       prec_diff     = prec     - dat_1980$prec,
+                       tavg_diff     = tavg     - dat_1980$tavg)%>%
+                select(county, 
+                       period, 
+                       log_corn_diff, 
+                       prec_diff, 
+                       tavg_diff)
+
+head(dat_diff)
+#>
+```
+
+In the next task, we visualize with a map, for each county, how the average temperature has changed between 1980 and 2000. Press `check` to load the map.
+
+```{r "1 a) 14", warning=FALSE}
+#< task
+
+plot_tavg_1980_2000 <- dat_diff%>% 
+                       select(county,tavg_diff)%>%
+                       rename(values=tavg_diff, fips=county)
+
+library(usmap)
+
+plot_usmap(regions = "counties", 
+           data    = plot_tavg_1980_2000,
+           exclude = c(.mountain, .pacific)) + 
+           scale_fill_continuous(low   = "white", 
+                                 high  = "darkred", 
+                                 name  = "Temperature Change in °C", 
+                                 label = scales::comma)+
+           labs(title = "Average Temperature Change between 1980 & 2000")+
+           theme(legend.position = "right")
+
+#>
+```
+
+In some counties, the average temperature has increased by up to 1.5 °C, while in others it has decreased by up to 0.5 °C. It should be noted here, that only two years were compared in each case, which were calculated by taking an average over a 5-year period. Despite the configuration of mean values, outliers can have a greater influence here, as the observation period is small. In addition to temperature change, the change in corn production between 1980 and 2000 is also interesting to observe for each county. Run the code below to visualize the change in corn production on a map.
+
+```{r "1 a) 15", warning=FALSE}
+#< task
+
+plot_corn_1980_2000 <- dat_diff%>% 
+                       select(county,log_corn_diff)%>%
+                       rename(values=log_corn_diff, fips=county)
+
+
+plot_usmap(regions = "counties", 
+           data    = plot_corn_1980_2000,
+           exclude = c(.mountain, .pacific)) + 
+           scale_fill_continuous(low   = "yellow", 
+                                 high  = "darkred", 
+                                 name  = "Log Corn Change", 
+                                 label = scales::comma)+
+           labs(title = "Corn Change between 1980 & 2000")+
+           theme(legend.position = "right")
+
+#>
+```
+
+Overall, corn production has increased slightly or remained the same. However, a clear trend is difficult to detect, as in some counties the corn production is also decreasing. 
+
+
+## Exercise 2 -- The Linear Regression Model
+
+In Exercise 1 we compared the change in temperature and corn yields between the year 1980 and 2000 and visualized the change in heat maps. Based on this visualization, it was possible to observe that the temperature has changed over time. In Exercise 2 we want to determine the influence of climate on corn production. To show the relationship between climate and corn production we use a linear regression model which is based on the method of least squares.
+
+
+### Linear Regression Model
+
+The linear regression model is used to show the relationships between a dependent variable $y$ and one or more independent variables $x$. To understand the basics of linear regression analysis, we start with a simple regression model which has only one explanatory variable $x$.
+
+$$y = \beta_{0} + \beta_{1}x+ u$$
+
+The dependent or response variable is $y$ which is explained in the model by the explanatory variable $x$. $\beta_{0}$ is the intercept of the linear regression line and $\beta{1}$ the slope. $\beta{1}$ is also called coefficient and is the estimator for the explanatory variable $x$. $u_{n}$ is the error term and represents unobserved factors that are not explained by the model. (Wooldridge (2015), p.22-23) 
+In this R-Tutor Set the Ordinary Least Square (OLS) method is used to calculate the estimators $\hat \beta = (\hat\beta_{0}, \hat\beta_{1},...,\hat \beta_{k})$. The Ordinary Least Square (OLS) Method calculates the estimates $\hat \beta$ by minimizing the residual sum of squares $RSS$ of the regression. The residual sum of squares is the squared sum of difference between the actual output $y$ and the estimated output $\hat y$ (Wooldridge (2015), p.30). More information about the OLS method can be found in the info box below.
+
+
+#< info "OLS"
+
+The Ordinary Least Square (OLS) Method is predicting the regression line and estimates $\hat\beta$ by minimizing the residual sum of squares $RSS$. Given following matrix notation of predicted output:
+
+$$\hat y = \hat \beta X \tag{1}$$
+
+The residual sum of squares is defined as the squared sum of difference between the actual output $y$ and the estimated output $\hat y$.
+
+$$RSS = \sum_{i=1}^{T} (y_{i} - x_{i}^T\hat\beta)^2 = (y-X\hat\beta)^T(y-X\hat\beta) = (y - \hat y)^2 = \hat\epsilon^2 \tag{2}$$
+An OLS estimate $\hat\beta$ minimizes the sum of squared residuals $\hat\epsilon^2$ by deriving the equation for $RSS$ to $\hat\beta$:
+
+$$\frac{\partial RSS}{\partial\hat\beta} = 0 \tag{3}$$
+By solving the equation $\tag{3}$ for $\hat\beta$ we receive the following equation to calculate the estimates $\hat\beta$:
+
+$$\hat\beta = (X^TX)^{-1} X^Ty \tag{4}$$
+(source: Hastie et al.(2009), p.11-12)
+#>
+
+Finally, with the calculated estimator, the aim is to make a quantitative statement about the impact of the explanatory variable $x$ on the dependent variable $y$. To make this statement as accurate as possible, an unbiased estimator is beneficial. An unbiased estimator is present, if the calculated estimators $\hat \beta$ are equal to the actual values of $\beta$ (Wooldridge (2015), p.48).
+
+$$E(\hat\beta) = \beta$$
+
+Computing an unbiased estimator with the given observations can be a very difficult task and may not be possible in some circumstances. However the basic requirement that an estimator must fulfill is to be consistent. Therefore the mean squared error is considered, which is computed by combining the variance and the bias of the estimators as follows:
+
+$$MSE = Bias(\hat\beta)^2 + Var(\hat\beta)$$
+
+Consistency is given when the mean squared error $MSE$ converges to $0$ with a growing observation number $n$.
+
+$$\lim_{n \to \infty}MSE(\hat\beta) = 0$$
+(source: Wooldridge (2015), p.169-171, p.763-764)
+
+#< info "Conditions for an estimator"
+
+#### Efficiency
+Another criteria for an estimator $\hat \beta$ is efficiency which is determined based on the variance $\sigma^2$ or mean squared error $MSE$ of an estimator. When comparing two possible unbiased or consistent estimators for $\beta$ the one with the smaller variance is the efficient one. (Kennedy (2008), p.34-36)
+
+
+#### Exogenity
+Another important assumption requires that the error term $\epsilon$ has an expected value of $0$ with the given explanatory variables $x_{1},...,x_{n}$ (Wooldridge (2015) ,p.86):
+
+$$ E(\epsilon| x_{1},x_{2}...,x_{k}) = 0$$ 
+If this assumption holds we have exclusively exogenous explanatory variables in the regression model. This means that none of the explanatory variables $x_{k}$ are correlated with the error term $\epsilon$:
+
+$$cor(\epsilon, x_{k}) = 0$$ 
+
+#>
+
+
+
+### Simple Linear Regression
+
+In this section we will implement our first regression. Therefore, we start with the following simple linear regression model:
+
+$$log\_corn_{it}= \beta_{0} + \beta_{1}tavg_{it} + u_{it} $$
+
+The log corn production $log\_corn_{it}$ is the dependent variable which is explained in the regression model by the average temperature `tavg_{it}`. Both variables are given by the county $i$ and year $t$. The standard error of the regression is $u_{it}$ and is also indicated at the county-year level. 
+
+A new exercise does not get the data passed from the previous exercise, so we need to reload the panel data set. The already used R packages do not have to be loaded again. Since we are starting a new exercise click `edit` first and then press `check` to load the panel data into the variable `dat` again.
+
+```{r "2 a) 1"}
+#< task
+dat = read_dta("us_panel.dta")
+head(dat,n=1)
+#>
+```
+
+According to the authors of the main paper Burke & Emerick (2015) an increased change in climate was measured in the beginning of 1980. Therefore, the period 1980-2000 is chosen as the main period, since a changing climate was observed during this period. Filter the data set `dat` to the main period, by filling in the missing code in the next task.
+
+```{r dev="svg"}
+#< fill_in
+#dat <- ___ %>% filter(year>= ___ & year<= ___)
+#>
+
+dat <- dat %>% filter(year>= 1980 & year<= 2000)
+```
+
+Now we can run our first regression with observations of the main period, where the log corn production should be explained by the average temperature. To perform the first regression we use the function `lm`. The function `lm` is called by first specifying the dependent variable and then the explanatory variable, separated by the symbol tilde ~. In addition the data set which contains the regression variables can be passed to the argument `data`. Fill in the missing code in the next task to run the regression with `log_corn` as the dependent variable and the average temperature `tavg` as the independent variable and save it in the variable `reg`. Then show the regression results by using the function `summary`.
+
+```{r dev="svg"}
+#< fill_in
+#reg = ___(log_corn ~ ___ , data= dat)
+#___(reg)
+#>
+
+reg = lm(log_corn ~ tavg , data= dat)
+summary(reg)
+```
+
+The summary function gives a good overview of the regression results. For a more detailed explanation of the statistical measures you can take a closer look at the info box *Summary Regression Output*. In our first regression model we did a simple regression with only one explanatory variable. Hence the regression result shows the estimator for $\beta_{0}$ which is the intercept and for $\beta_{1}$ the average temperature. The interpretation of the intercept is generally not recommended, so we will not interpret the estimator $\hat \beta_{0}$ in this R-Tutor set.
+
+#< info "Summary Regression Output"
+
+  * **Residuals** are the differences between the predicted values and the actual values $\hat u = y - \hat y$. In the summary output the distribution of the residuals is shown by the minimal, maximal and median value and the lower and upper quartile.
+  * **Coefficients** 
+    * **Estimates** is the column, where for each explanatory variable and the intercept an estimate $\hat \beta_{0}...\hat\beta_{n}$ is given which is used to predict the dependent variable of the regression.
+    * **Std.Error** indicates the average value in which the estimator deviates from the actual value.
+    * **t value** is the estimate $\hat \beta_{n}$ divided by the corresponding Standard Error.
+    * **Pr(>|t|)** represents the p-value which shows at which **significance level** the null hypothesis can be rejected. The null hypothesis $H_{0}$ implies that the relationship between y and x was due to chance. 
+  * **Residual standard error** is the average error of the Residuals. 
+  * **degrees of freedom** shows the number of observations used for the regression minus the number of estimated coefficients.
+  * **R-squared** is the percentage of variance of the dependent variable which can be explained by the explanatory variables.
+  * **adjusted R-squared** is a measure for goodness-of-fit which controls by multiple regression for overfitting when adding explanatory variables. 
+  * **F-statistics** is a general indicator if the relation between the dependent and all independent variables in the model is by chance, indicated by a p-value for the whole model.
+
+See Wooldridge, J. M. (2015, pp.30,122,847-858) 
+#>
+
+The coefficient $\hat\beta_{1}$ of the average temperature `tavg` has a negative value of -0.046. Since the response variable in this regression is a logarithmic value the regression result is interpreted as follows. If the average temperature increases by one unit, the corn production decreases of approximately 4.6%. The standard error of the estimator of `tavg` is close to zero. The p-value is smaller than 0.001 which indicates that the explanatory variable is significant at the 0.1% level. R-squared $R^2$ is a measure for the goodness of fit of our model which has a value of 0.1347. The value of $R^2$ implies that our model can explain 13.47 % of the variance of the `log_corn` variable with the explanatory variable `tavg`. The higher $R^2$ the better the model fits and explains the variance of the dependent variable. The $adjusted \ R^2$ also indicates the percentage of variance of the dependent variable which can be explained by the model, but controls for the effect that adding variables to the model can automatically lead to a better explanation of the variation. In this model $R^2$ and the $adjusted\ R^2$ are the same because we have only one explanatory variable in the model. 
+
+However, based on the $R^2$ we cannot make a conclusion whether the variable `tavg` has actually a causal effect on the variable `log_corn`. The **causal effect** means that the change in one variable leads to a change in another variable. In order to explicitly measure the causal effect of one variable on another, all other influencing factors would have to be hold fix. This circumstance of all other factors remaining equal is also referred to as **ceteris paribus** which can be very difficult to implement.(Wooldridge (2015), p.12-16)
+
+
+
+## Exercise 2.1 -- Piecewise Regression
+
+In exercise 2 we set up a simple regression model with average temperature `tavg` as the explanatory variable and `log_corn` as the dependent variable. When calculating the regression coefficient for `tavg`, a negative estimator of -0.046 was calculated. The regression result implies that a rising average temperature has a negative effect on corn growth. Comparing this conclusion with Sànchez et al. (2014) who have summarized 140 scientific articles that determined the temperature thresholds of corn, it seems reasonable to look more closely at the negative sign of the average temperature coefficient. In their review Sànchez et al. found out that corn has an optimum temperature of around 30°C. It should be noted that in this case corn cultivation has been considered in more southern countries than the United States, which are believed to grow more heat-tolerant corn varieties.
+
+
+#< quiz "Temperature Impact"
+question: Can we generally assume that increasing temperatures have a negative impact on corn ?
+sc:
+    - yes, rising temperatures have a negative impact on corn
+    - no, only above a certain threshold temperature has a negative impact on corn growth*
+   
+success: Correct.
+failure: Try again
+#> 
+<p></p>
+<p></p>
+<p></p>
+We can assume a non-linear relationship between temperature and corn which is positive up to a certain degree Celsius and above a certain point turns into a negative relationship. This point is also called a breakpoint, which is a threshold where a sudden change in the relationship between the explanatory variable and the dependent variable is observed. To obtain the critical breakpoint and to account for this non-linear relationship between temperature and corn, a piecewise multiple regression model is used.
+
+
+### Determination of Breakpoints
+
+
+Toms & Lesperance (2003) states that the simplest piecewise regression model is defined  with two linear regression lines. A simple pieceweise regression consists of one regression for x values smaller or equal than the breakpoint $c$ and one regression for x values greater than the breakpoint $c$. Resulting to the following two regression equations:
+
+$$y_{i} = \beta_{0} + \beta_{1}x_{i} + u_{i} \ \ \ \ \ \ \ \ \ \ \ \ \ \  \ \ \ \ \ \ \ \ \ ,for \ x_{i} \le c $$
+
+$$y_{i} = \beta_{0} + \beta_{1}x_{i} + \beta_{2}(x_{i}-c) + u_{i} \ \ ,for \ x_{i} > c$$
+
+According to Tom & Lesperance (2003), the above model is appropriate to use when a sudden change at the threshold c is observed. On the basis of the piecewise regression Burke & Emerick (2005) determined the critical threshold for temperature based on the available data. They looped over all potential values for the threshold c and selected the threshold value, by choosing the model with the smallest sum of squared residuals. Using this approach, the temperature threshold of 29°C was identified.
+
+
+On the basis of the temperature threshold value of 29°C, we can now set up a multiple regression. This model will contain two explanatory variables representing the temperatures in the lower interval: $l_{0}=0°C$ to $l_{1}=29°C$ and the upper interval $l_{1}=29°C$ to $l_{\infty}= \infty$. To represent these two temperature intervals with two variables the variables `dday0C` and `dday29C` are used. For our calculations, we again need to load the panel data set. Press `edit` and `check` to load it.
+
+```{r "2 b) 1"}
+#< task
+dat = read_dta("us_panel.dta")
+head(dat)
+#>
+```
+
+We remember the value of the variable `dday0C` is the percentage of time where more than 0°C was measured accumulated to a annual value. The same applies to `dday29C` where more than 29°C was measured. In the next task we calculate a lower temperature interval with the lower bound $l_{0} = 0$ and the upper bound $l_{1}=29°C$ and store it in the variable `gdd_lo`. To obtain the lower temperature interval `gdd_lo` we subtract from `dday0C` the duration where more than 29°C was measured. Fill in the missing code in the task below to calculate `gdd_lo` by subtracting `dday29C` from `dday0C`: 
+
+```{r dev="svg"}
+#< fill_in
+#dat <- dat%>%filter(year>= 1980 & year<= 2000)%>%
+#             mutate(gdd_lo = ___-___,
+#                    gdd_hi = dday29C)
+#>
+dat <- dat%>%filter(year>= 1980 & year<= 2000)%>%
+             mutate(gdd_lo = dday0C-dday29C,
+                    gdd_hi = dday29C)
+```
+
+The data frame `dat` was again restricted to the main observation period 1980-2000. Since the upper interval starts with the lower boundary $l_{1}=29°C$ and is unbounded upwards, we do not need any additional calculation for the higher temperature interval `gdd_hi` and can define the variable `dday29C` as `gdd_hi`. The abbreviation *gdd* is short for *Growing Degree Day* and is a common heat measure that represents the duration of the ambient temperature. 
+
+
+
+### Piecewise Model
+
+
+Now we can set up the first piecewise regression model as follows:
+
+$$log\_corn_{it}= \beta_{0} + \beta_{1}gdd\_lo_{it}+\beta_{2}gdd\_hi_{it}+ u_{it}$$
+
+The response variable remains the logarithmic corn production `log_corn` which is explained in the model by the growing degree days in the lower temperature interval `gdd_lo` and the higher temperature interval `gdd_hi`. To calculate the piecewise regression model, add the missing code below and save the result in `reg_piec`. Then call the results with the function `summary`.
+
+```{r dev="svg"}
+#< fill_in
+#reg_piec = ___(log_corn ~ ___ + ___ , data= dat)
+#___(reg_piec)
+#>
+
+reg_piec = lm(log_corn ~ gdd_lo + gdd_hi , data= dat)
+summary(reg_piec)
+```
+
+Now the coefficients also reflect the expected relationship between temperature and corn production. If the duration in the lower temperature interval `ggd_lo` increases by one unit then the logarithmic corn production increases by roughly 0.01%. However, if the unit of `gdd_hi` increases by one unit, the corn production decreases by approximately 0.38%. Here it is already useful to mention that our main regressor of interest is `gdd_hi`, which represents extreme temperatures. As part of the R-Tutor set, we want to observe whether farmers are adapting to the negative effects of extreme heat. First, however, we need to include more control variables in our regression model to obtain consistent estimators. We will learn more about control variables in the next chapter 2.3.
+
+
+## Exercise 2.2 -- Addition of Control Variables
+
+In the beginning of Exercise 2 we talked about consistent estimators, which is the minimum requirement for an estimator. In this task we will discuss if we have consistent estimators in our model and how to improve the accuracy of the estimators by adding control variables to the regression.
+
+
+### Omitted Variable Bias
+
+First we need to address the omitted variable bias, which is caused by omitting a relevant explanatory variable in the regression model (Wooldridge (2015), p.88-89). If we look at our previous regression model, which has so far only considered the growing degree days as explanatory variables for corn production, we can suspect an omitted variable bias. 
+
+$$log\_corn_{it}=\beta_{0} + \beta_{1}gdd_\_lo_{it} + \beta_{1}gdd_\_hi_{it} + u_{it}$$
+
+Since precipitation has an influence in corn growth as well as temperature, which is represented by the growing degree days, we can assume an omitted variable bias in the model. The unobserved impacts, due to the omission of rain as an explanatory variable, are represented here by the error term $u$. However an important assumption requires that the error term $u$ should have an expected value of $0$ with the explanatory variables $x_{1},...,x_{n}$ in the model (Wooldridge (2015),p.86):
+
+$$E(u| x_{1},x_{2}...,x_{k}) = 0$$ 
+
+When the assumption holds we have exclusively exogenous explanatory variables in the regression model and none of the explanatory variables $x_{k}$ are correlated with the error term $u$:
+
+$$cor(u, x_{k}) = 0$$ 
+(source: Wooldridge (2015), p.86-87)
+
+If a variable in the model is correlated with the error term $u$, then the variable is an endogenous variable (Wooldridge (2015), p.86-87). In our previous model, we included only growing degree days as explanatory variables. 
+
+
+#< quiz "Exogen or Endogen"
+question: Would you assume endogenous or exogenous variables in this model?
+sc:
+    - endogen*
+    - exogen 
+    
+success: Correct!
+failure: Try again.
+#>
+<p></p>
+<p></p>
+<p></p>
+
+If we only consider growing degree days as explanatory variables to explain corn production than precipitation is an unobserved variable, which is part of $u$. Since temperature and rain are related to each other, this leads to a correlation between the explanatory variable and the error term $u$. In addition rain is an unobserved variable which affects the outcome of the corn production, resulting in the variables `gdd_lo` and `gdd_hi` being endogenous variables. If we have one or more endogenous variables in our model we have calculated inconsistent and biased estimators (Wooldridge (2015), p.88-91).
+
+Since we want to obtain consistent estimators, we need to consider the influence of precipitation on corn production in our model. Using the same approach as for temperature, Burke & Emerick (2005) calculated a threshold of 42 cm for precipitation. In the following tasks we load the data set `us_panel_gdd` which already contains the variables `gdd_lo` & `gdd_hi`. Press edit and check to display the data set.
+
+```{r "2 c) 1"}
+#< task
+dat = read_dta("us_panel_gdd.dta")
+head(dat)
+#>
+```
+
+The variable `prec` contains the annual total precipitation in cm per county and year. We will now split the variable `prec` by the breakpoint 42 cm into two variables `prec_lo` and `prec_hi`. Below you can see how the lower precipitation variable `prec_lo` should be calculated with the breackpoint $p_{0} = 42$:
+
+$$prec\_lo = prec - p_{0}, \ \ \ if \ \ prec\le 42$$
+
+$$prec\_lo = 0, \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ if \ \ prec> 42$$
+
+The variable `prec_hi` is calculated like `prec_lo`, only with a reverse case distinction. To calculate the lower and higher precipitation variables the function `case_when` from the `dplyr` package is helpful. Complete the calculation of `prec_hi` by inserting the comparison operator >, >=, < or <= to the placeholders in the next task.
+
+```{r dev="svg"}
+#< fill_in
+#dat <- dat%>%filter(year>= 1980 & year<= 2000)%>%
+#             mutate(
+#                    prec_lo = 
+#                    case_when(
+#                              prec <= 42 ~ prec-42,
+#                              prec  > 42 ~ 0),
+#                    prec_hi = 
+#                    case_when(
+#                              prec ___ 42 ~ prec-42,
+#                              prec  <= 42 ~ 0))
+#>
+
+dat <- dat%>%filter(year>= 1980 & year<= 2000)%>%
+             mutate(
+                    prec_lo = 
+                    case_when(
+                              prec <= 42 ~ prec-42,
+                              prec  > 42 ~ prec*0),
+                    prec_hi = 
+                    case_when(
+                              prec  > 42 ~ prec-42,
+                              prec <= 42 ~ prec*0))
+```
+
+Now we can set up the following regression model, with `log_corn` as the dependent variable and `gdd_hi`, `gdd_lo`, `prec_lo` and `prec_hi` as explanatory variables.
+
+$$log\_corn_{it}= \beta_{0} + \beta_{1} \ gdd_\_lo_{it}+\beta_{2} \ gdd_\_hi_{it}+\beta_{3} \ prec\_lo_{it}+\beta_{4} \ prec\_hi_{it}+ u_{it}$$
+
+Fill in the missing code to calculate the regression and store it in the variable `reg1`. Subsequently call an overview of the regression results with the function `summary`.
+
+```{r dev="svg"}
+#< fill_in
+#reg1 = ___(log_corn ~ ___ + ___ + ___ + ___, data= dat)
+#___(reg1)
+#>
+
+reg1 = lm(log_corn ~ gdd_lo + gdd_hi + prec_lo + prec_hi , data= dat)
+summary(reg1)
+```
+
+According to the coefficient of `ggd_lo` another unit of growing degree days of heat below 29°C, leads to an increase of log corn production by 0.0084 % .  In contrast, one additional unit of degree days above 29°C results in a reduction of 0.36 % in log corn production. For one additional centimeter of rainfall below 42 cm, corn yields increase by 0.67%. All the mentioned coefficients are statistically significant at the 0.001 level. For the estimator `prec_hi`, the null hypothesis, cannot be rejected at a significance level. Which means we cannot rule out that the relationship, between precipitation above 42 cm and the log corn production, is due to chance.
+
+Unfortunately, we cannot use any statistical measure to determine whether our calculated estimators $\hat\beta$ for the explanatory variables are biased because of an omitted relevant variable.
+
+#< quiz "Ommited Variable Bias"
+question: Which variable should we not forget to include in the model, otherwise there could be a bias due to omitted variables? 
+sc:
+    - a variable that is correlated with one (or more) of the explanatory variables. 
+    - a variable that has an impact on corn production. 
+    - a variable that is correlated with one (or more) explanatory variables and has an impact on corn production.*
+    
+success: Correct!
+failure: Try again.
+#>
+
+Our explanatory climate variables may not be exogenous, because we did not consider greenhouse gases in our model. Erda et al. (2005) simulated China's climate with the climate change model (PRECIS) which was developed by the UK's Hadley Centre. Based on the climate simulation, they came to the conclusion that depending on emissions, the average temperature will rise between 3°C and 4°C by the end of the 21st century. On the other hand according to the model by Erda et al. (2005), climate warming without carbon dioxide (C02) would lead to lower corn production by up to 37%. Since C02 in general has a positive fertilizing effect on the corn plants. In addition to emissions, pest insects can also have an impact on corn production. Taylor et al. (2018) found that due to climate change, pest insects tend to migrate to the north because they find better climatic conditions there. However the omission of pest insects in the model should not lead to an omitted variable bias, since temperature is not correlated to pest insect, even if there is a correlation the other way around. Careful considerations are required to include all necessary variables and to have exogenous variables present in the regression model.
+
+
+### Fixed Effects
+
+In this section we will extend our model from above with fixed effects. Fixed effects are used to account for unobserved changes which can be time varying or time fixed. We therefore want to reconstruct the following equation with R:
+
+$$y_{it}= \beta_{0} + \beta_{1} \ gdd\_lo_{it}+\beta_{2} \ gdd\_hi_{it}+\beta_{3} \ prec\_lo_{it}+\beta_{4} \ prec\_hi_{it} + \alpha_{i} +\delta_{t}+ u_{it}$$
+
+with $t$ indicating the year and $i$ the county. The added fixed effects are $\alpha_{i}$ and $\delta_{t}$. $\alpha_{i}$ estimates the change in corn yields for all counties while controlling for time variant characteristics. In this case the years are hold fix so $\alpha_{i}$ only represents changes that do not change over time, like the geographical location of counties. $\delta_{t}$ computes the usual change in corn yields while holding the time-invariant county specific factors fix. $\delta_{t}$ could represent changes like new developments over time such as technologies or new fertilizers in the agriculture. 
+
+To include the fixed effects in our model we use the function `felm` from the `lfe` package. The regression call `felm` is structured in four parts, for example `felm(y ~ x1 + x2 +...|2.|3.|4., data,...`. The first part contains the regression structure with the dependent variable and the explanatory variables. The second section specifies the variables for which a fixed effect is calculated. The third part is used for the instrument variable estimation, which is not used in this R-Tutor set, and the last part is for the calculation of clustered standard errors which we will discuss later. In the next task add the variables `county` and `year` to calculate the fixed effect model `reg2`:     
+
+```{r dev="svg"}
+#< fill_in
+#library(lfe)
+#reg2 = felm(log_corn ~ gdd_lo + gdd_hi + prec_lo + prec_hi| ___ + ___ |0|0, data= dat)
+#>
+
+library(lfe)
+reg2 = felm(log_corn ~ gdd_lo + gdd_hi + prec_lo + prec_hi| county + year |0|0, data= dat)
+
+```
+
+Run the code in the next task to display the results `reg1` without fixed effects and `reg2` with fixed effect in one table.
+
+```{r "2 c) 4", results='asis'}
+#< task
+library(stargazer)
+
+stargazer(reg1, reg2,
+          model.names = FALSE,
+          model.numbers=FALSE,
+          type='html',
+          digits=3,
+          column.labels=c("OLS", "FE"),
+          column.sep.width = "7pt",
+          omit = c("Constant"),
+          omit.stat = c("f","ser"),
+          add.lines = list(c("Fixed Effects", "None", "County,Yr","County,Yr")))
+
+#>
+```
+<p></p>
+<p></p>
+By adding county and year fixed effects we also accounted by temperature and precipitation for county-specific (time-invariant) and year-specific (time-variant) factors in the model. These factors are correlated with our explanatory variables and have an impact on corn yields. If we had not included the fixed effects in our model, we would have calculated inconsistent and biased estimators because our model would have used endogenous variables to calculate the causal effect on yields.
+
+
+
+### Clustered Standard Errors
+
+A criterion for the standard errors $\epsilon$ is a distribution which is independent, identical and normal distributed. In this case the standard error has for each independent variable the same variance and the standard errors are homoscedastic. For more information on homoscedasticity and the distribution of the error term, see the infobox below. In the main paper Burke & Emerick (2005) assume no homoscedasticity in the model due to a correlation of standard errors within a state. To overcome this correlation within a state the standard errors can be clustered at the state level. Complete the missing code to extend the regression `reg2` from the previous task with the clustered standard errors at the `state` level.
+
+#< info "Autocorrelation & Heteroscedasticity"
+
+#### Distribution of the Error Term
+
+A criterion for the error terms $\epsilon_{n}$ is that they are independently and identically normally distributed $N(0,\sigma^2)$ ( Wooldridge (2015), p.374). If this condition for the error terms is violated, it can lead to Autocorrelation and Heteroskedasticity. Autocorrelation is present when the error terms $\epsilon_{t}$ are correlated over time (Wooldridge (2015), p.353). Also Heteroskedasticity can occur when the independent and identical normal distribution of $\epsilon$ is not given and is the opposite of Homoscedasticity. Homoscedasticity states that the error term $\epsilon$ has always the same variance for any explanatory variable ( Wooldridge (2015), p.51):
+
+$$Var(\epsilon|X = \sigma^2)$$
+#>
+
+
+```{r dev="svg", results='asis'}
+#< fill_in
+#reg3 = felm(log_corn ~ gdd_lo + gdd_hi  + prec_lo + prec_hi| county + year |0| ___, data= dat)
+
+#stargazer(reg1, reg2,reg3,
+#          model.names = FALSE,
+#          model.numbers=FALSE,
+#          type='html',
+#          digits=3,
+#          column.labels=c("OLS", "FE","Clustered SE"),
+#          omit = c("Constant"),
+#          omit.stat = c("f","ser"),
+#          add.lines = list(c("Fixed Effects", "None", "County,Yr","County,Yr","County,Yr")))
+#>
+
+reg3 = felm(log_corn ~ gdd_lo  + gdd_hi + prec_lo + prec_hi| county + year |0|state, data= dat)
+
+stargazer(reg1, reg2,reg3,
+          model.names = FALSE,
+          model.numbers=FALSE,
+          type='html',
+          digits=5,
+          column.sep.width = "7pt",
+          column.labels=c("OLS", "FE","Clustered SE"),
+          omit = c("Constant"),
+          omit.stat = c("f","ser"),
+          add.lines = list(c("Fixed Effects", "None", "State","County,Yr","County,Yr")))
+
+```
+
+When we compare `reg2` and `reg3`, we can see that the results are not very different. Adding the clustered standard errors to the fixed effect model does not seem to change much in the results. 
+
+
+### Weighted Regression
+
+In the future in addition to fixed effects, we will weight each regression by corn area per county. Here the question arises when do we weight a regression? 
+Solon et al. (2015) answers this question and gives three motives when a regression should be weighted:
+
+1. To adjust for heteroskedastic error terms
+2. Correcting for endogenous sampling
+3. Weighting to determine unobserved correlation within a group
+
+In our case we justify for weighting by corn area to correct for corn area size in a county and thus adjust for heteroskedastic error terms. In the next task we want to weight our regression. For this purpose pass in the next task to the parameter `weight` the variable `corn_area` and store the regression result in the variable `reg4`.
+
+```{r dev="svg"}
+#< fill_in
+#reg4 = felm(log_corn ~ gdd_lo + gdd_hi + prec_lo + prec_hi| county + year |0| state, data= dat, weight = dat$___)
+
+#>
+reg4 = felm(log_corn ~ gdd_lo + gdd_hi + prec_lo + prec_hi| county + year |0|state, data= dat, weight = dat$corn_area)
+```
+
+Press "check" in the next task to get all regression results of this exercise.
+
+```{r "2 c) 5", results='asis'}
+#< task
+library(stargazer)
+
+stargazer(reg1, reg2,reg3,reg4,
+          model.names = FALSE,
+          model.numbers=FALSE,
+          type='html',
+          digits=5,
+          column.sep.width = "16pt",
+          column.labels=c("OLS", "FE","Cluster SE","Weight"),
+          omit = c("Constant"),
+          omit.stat = c("f","ser"),
+          add.lines = list(c("Fixed Effects", "None", "County,Yr","County,Yr","County,Yr","County,Yr")))
+
+#>
+```
+<p></p>
+<p></p>
+Here we can see that the variable `gdd_hi` has gained influence by adding the fixed effects and by weighting the regression. The estimator for extreme heat has increased from 0.00361 to 0.00548 in absolute value. The goodness of fit $R^2$ is higher in the regression model `reg4` than in `reg1`. The regression `reg4` accounts for fixed effects, clustered standard errors and weights. In `reg1` these factors are not considered. The regression model `reg4` explains 77% of variance in the corn production by the explanatory variables. 
+
+
+## Exercise 2.3 -- Long Differences
+
+In this Exercise, the calculation of the regression model with long differences is presented. Later in chapter 3, these results are compared with the regression results calculated with the panel data. The term long differences is due to the calculation of the difference between the start year 1980 and the end year 2000 of our main observation period.
+
+
+### First Difference Method
+
+Before we calculate the "long difference" regression we take a look at the first difference method on which our later calculations are based on. We have two equations one with year $t$:
+  
+$$y_{it}=\beta_{0} + \beta_{1}x_{it} + \alpha_{i} + u_{it} \tag{1}$$ 
+
+And one with year $t+n$:
+    
+$$y_{it+n}=\beta_{0} + \beta_{1}x_{it+n} + \alpha_{i} + u_{it+n} \tag{2}$$
+
+Equation (1) contains the observed values in year $t=1$ and equation (2) contains the observed values in year 2 with $n=1$. To compute the first difference the difference of equation (1) and (2) is taken: 
+        
+$$y_{i1} -y_{i2} =(\beta_{0} - \beta_{0}) + \beta_{1} (x_{i1} -x_{i2}) + (\alpha_{i} - \alpha_{i})  + (u_{i1} - u_{i2}) \tag{3}$$
+
+We obtain the following equation by taking the first difference:
+
+$$\vartriangle y_{i}=\beta_{1}\vartriangle x_{i} + \vartriangle u_{i} \tag{4}$$
+We can see that time-invariant factors like $\beta_{0}$ and $\alpha_{i}$ drop out.
+
+(source: Wooldridge (2015), p.461-463)
+
+
+### 5 Year Averages
+
+To make 1980 a representative year for the start of our main period, we take a 5-year average over the years 1978-1982. Also for the year 2000, a 5-year average is calculated with the period 1998-2002. By taking the 5 year average for 1980 and 2000 we ensure that these years are representatives for the start and end time period and counter possible outliers, like extreme heat in one year. Press `edit` and `check` in the next task to load the panel data as usual.  
+
+```{r "2 d) 1"}
+#< task
+dat = read_dta("us_panel.dta")
+#>
+```
+
+In the next task we will compute the data frame `mean_1980`, which contains the 5 year means of the relevant regression variables. Since we want to calculate the mean value from 1980, the data set is limited to the period 1978 to 1982. In the data frame `mean_1980` only those counties are kept, with a complete observation period. Here we use again the function `n` which gives us the current group size.
+
+```{r "2 d) 2"}
+#< task
+mean_1980 <- dat%>% 
+               filter(year>=1978 & year <= 1982)%>%
+               group_by(state,county)%>% 
+               mutate(county_count = n())%>% 
+               filter(county_count == 5)%>%  
+               summarise(log_corn_start  = mean(log_corn),
+                         dday0C_start    = mean(dday0C),
+                         dday29C_start   = mean(dday29C),
+                         prec_start      = mean(prec),
+                         corn_area_start = mean(corn_area),
+                         tavg_start      = mean(tavg),
+                         start           = 1980)
+head(mean_1980)
+#>
+```
+
+The variables in `mean_1980` are extended with the label `_start`. In the data frame `mean_2000` the variables have the suffix `_end`. Fill in the missing code to calculate the 5 year averages for the year 2000, which are saved in the new data frame `mean_2000`.
+
+```{r dev="svg"}
+#< fill_in
+#mean_2000 <- dat%>% 
+#               filter(year>=___ & year <=___)%>%
+#               group_by(state,county)%>% 
+#               mutate(county_count = n())%>% 
+#               filter(county_count == ___)%>%  
+#               summarise(log_corn_end  = ___(log_corn),
+#                         dday0C_end    = mean(dday0C),
+#                         dday29C_end   = mean(dday29C),
+#                         prec_end      = mean(prec),
+#                         corn_area_end = mean(corn_area),
+#                         tavg_end      = mean(tavg),
+#                         end           = 2000)
+#head(smooth_2000)
+#>
+mean_2000 <- dat%>% 
+               filter(year>=1998 & year <= 2002)%>%
+               group_by(state,county)%>% 
+               mutate(county_count = n())%>% 
+               filter(county_count == 5)%>%  
+               summarise(log_corn_end  = mean(log_corn),
+                         dday0C_end    = mean(dday0C),
+                         dday29C_end   = mean(dday29C),
+                         prec_end      = mean(prec),
+                         corn_area_end = mean(corn_area),
+                         tavg_end      = mean(tavg),
+                         end           = 2000)
+head(mean_2000)
+```
+
+
+### Long Differences
+
+Fill in the missing code in the next task to combine the two data frames `mean_1980` and `mean_2000` to the data set `mean_1980_2000` with the join variable `county`.
+
+```{r dev="svg"}
+#< fill_in
+#mean_1980_2000<-merge(mean_1980,mean_2000, by = "___")
+#>
+
+mean_1980_2000<-merge(mean_1980,mean_2000, by = "county")
+```
+
+By calling the `merge` function as above with no other arguments, the `merge` function performs an inner join, where only the matching counties are combined. Counties that are only found in `mean_1980` or `mean_2000` are dropped. Now we can calculate the differences between 1980 and 2000. 
+
+In the next task we calculate the differences for the corn production `log_corn`, the lower precipitation `prec_lo`, the higher precipitation `prec_hi`, the lower growing degree day interval `gdd_lo` and the higher growing degree day interval `gdd_hi`. To obtain `log_corn` and `gdd_hi` we can take the difference between the end and start period of the corresponding variables. For `prec_lo` we now have to distinguish if `prec_start` and `prec_end` both had less than 42 cm of precipitation per year or if one had less and the other had more. Accordingly, the calculation of `prec_lo` must be adjusted. The same vice versa applies for `prec_hi`. To calculate `gdd_lo` we first calculate the lower interval of (0°C to 29°C] and then calculate the difference between 1980 and 2000. For `corn_area` no difference is computed and the `corn_area` is set for the area in the start period. 
+
+```{r "2 d) 3"}
+#< task
+dat_ld <- mean_1980_2000 %>%
+          mutate(state     = state.x,
+                 county    = county,
+                 period    = "1980_2000",
+                 log_corn  = log_corn_end - log_corn_start,
+                 prec_lo   = 
+                    case_when(
+                      prec_start <  42 & prec_end <= 42  ~ prec_end - prec_start,
+                      prec_start <= 42 & prec_end >  42  ~ 42 - prec_start,
+                      prec_start >  42 & prec_end <= 42  ~ prec_end - 42,
+                      TRUE ~ as.numeric("0")),
+                 prec_hi   = 
+                    case_when(
+                      prec_start >  42 & prec_end >  42  ~ prec_end - prec_start,
+                      prec_start <= 42 & prec_end >  42  ~ prec_end -42,
+                      prec_start >  42 & prec_end <= 42  ~ 42 - prec_start,
+                      TRUE ~ as.numeric("0")),
+                 gdd_lo    = (dday0C_end - dday29C_end)-(dday0C_start - dday29C_end),
+                 gdd_hi    = dday29C_end - dday29C_start,
+                 corn_area = corn_area_start)%>%
+          select(state, county, period, log_corn, gdd_lo, gdd_hi, prec_lo, prec_hi, corn_area)
+
+head(dat_ld)
+#>
+```
+
+In `dat_ld` we calculated the changes in the variables between 1980 and 2000. We will use these data to calculate the regression model in the next section.
+
+
+### Regression with Long Differences
+
+We will now compute the following regression model using the long differences data set.
+
+$$\vartriangle corn\_log_{is}= \vartriangle \beta_{1} \ gdd\_lo_{is}+\vartriangle \beta_{2} \ gdd\_hi_{is}+\vartriangle \beta_{3} \ prec\_lo_{is}+\vartriangle \beta_{4} \ prec\_hi_{is} + \alpha_{s} + \vartriangle u_{is}$$
+
+$\vartriangle$ represents the differences in the variables between the year 1980 and 2000 for county $i$ in state $s$. The dependent variable is the logarithmic corn production which is explained in the model by the lower temperature interval `gdd_lo` and the higher temperature interval `gdd_hi`, as well as `prec_lo` and `prec_hi`. In addition, the fixed effect state $\alpha_{s}$ is included in the model, which controls for time varying fixed effects on the state level. One example could be agricultural subsidies which differ over time on the state level, according to the Environmental Working Group. In Iowa, for example, the difference in farm subsidies between 1995 and 2020 is about 35 million $.
+
+What could be a cause of correlation of standard errors within a state in our model? One possible cause could be agricultural subsidies, which vary from state to state according to Environmental Working Group. If states with higher government subsidies have higher crop yields, clustering the standard errors will take this factor into account when calculating the estimator for $\epsilon$.
+
+Additional the regression is weighted by the corn area in 1980 and the standard errors are clustered at the state level.
+
+```{r "2 d) 4"}
+#< task
+
+reg_ld = felm(log_corn ~ gdd_lo + gdd_hi + prec_lo + prec_hi|state|0|state,data = dat_ld, weight = dat_ld$corn_area)
+summary(reg_ld)
+#>
+```
+
+We recall that the variable of interest is `gdd_hi` which represents extreme temperatures and has a negative impact on corn production. The estimator $\hat\beta_2$ of the explanatory variable `gdd_hi` has a value of approximately -0.0052. In Exercise 2.2 we used panel data to calculate the regression model and received a more negative value of -0.0055. The estimator $\hat\beta_{2}^P$, calculated with panel data, shows the short-term impacts of extreme heat on corn production. While the estimator $\hat\beta_{2}^LD$, calculated using the long differences, represents the long-term effects of extreme heat on corn production. These results of the panel regression and long difference regression are examined further in chapter 3, to calculate the farmers adaption to extreme heat. 
+
+
+## Exercise 3 -- Measure for Adaptation
+
+In chapter 3, we will examine whether farmers have adapted to climate change. By setting up the regression model as a piecewise regression in chapter 2, we observed that temperatures above 29°C had a negative effect on corn production. For this reason $\beta_{2}$, the estimator for the explanatory variable of growing degree days above 29°C, is the main regressor of interest in identifying whether adaptation to climate change has occurred. Burke & Emerick established the following measure to evaluate whether adaptation to extreme heat has taken place:
+
+$$1- \frac{\hat\beta_{2}^{LD}}{\hat\beta_{2}^{P}}$$
+
+$\hat\beta_{2}^{LD}$ is the estimator we calculated with the regression based on the long differences and $\hat\beta_{2}^{P}$ is the estimator from the regression with the panel data. 
+
+#< quiz "No or full adaptation"
+
+question: If the adaption measure after substituting the values of $\hat\beta_{2}^{LD}$ and $\hat\beta_{2}^{P}$ is equal to 0, which conclusion can we draw?
+
+sc:
+    - No adaptation has been made*
+    - Full adaptation has taken place 
+   
+success: Correct.
+failure: Try again
+#>
+<p></p>
+<p></p>
+
+If the adaptation measure is 0, it means that $\hat\beta_{2}^{LD}$ and $\hat\beta_{2}^{P}$ are equal and the negative short-term effects of extreme heat could not be mitigated at all in the longer run. 
+
+#< quiz "When was adapted"
+
+question: If $\hat\beta_{2}^{LD}$ is smaller in absolute value than $\hat\beta_{2}^{P}$, has there been an adaptation to extreme heat?
+
+sc:
+    - No in this case, the negative impact of heat has increased in the long term
+    - Yes, because then the negative influence of heat was reduced in the long term*
+   
+success: Correct.
+failure: Try again
+#>
+<p></p>
+<p></p>
+
+If $\hat\beta_{2}^{LD}$ is smaller in absolute value, we assume that an adjustment has taken place and the negative influence of extreme heat has decreased. The measure of adaptation then indicates the percentage of short-term effects of extreme heat that have been offset in the long run.
+
+
+## Exercise 3.1 -- Adaptation in Corn Production
+
+In section 3.1, we calculate the measure of adaptation and examine whether there has been an adaptation in corn production. An adaptation in corn production could be for example, the decision of the farmer to grow more heat-resistant corn varieties. To calculate the measure for adaptation, we recalculate the regression results from chapter 2 by using the panel data and the long differences.
+
+### Compare Panel vs Long Difference Regression
+
+First we load the panel data set `us_panel_reg.dta` and store the data in `dat_panel`. Press `edit` and then `check` to load the data and display the first 6 rows. 
+
+```{r "3 a) 1"}
+#< task
+dat_panel = read_dta("us_panel_reg.dta")
+head(dat_panel)
+#>
+```
+
+We recall that the growing degree day intervals `gdd_lo`, `gdd_hi` had to be first calculated based on their respective threshold of 29 °C in chapter 2.1. To further obtain the explanatory variables `prec_lo` and `prec_hi` we first had to perform a case distinction in chapter 2.2 with the threshold of 42 cm. These calculations for the explanatory variables are already completed in the pre-processed data set `dat_panel`. 
+
+Now we save the data set `ld_reg.dta` in the data frame `dat_ld` to obtain the long differences data. Press `check` to run the already given code.
+
+```{r "3 a) 2"}
+#< task
+dat_ld = read_dta("ld_reg.dta")
+head(dat_ld)
+#>
+```
+
+Similar to `dat_panel`, the explanatory variables have already been calculated in `dat_ld`. Furthermore, the differences between the years have been already calculated for the dependent and the explanatory variables in order to avoid repeating computations from chapter 2.3. In addition to the period 1980-2000, differences from other periods of varying length were also formed here.
+
+For now we will start with the main period 1980-2000 again. Therefore, fill in the missing code below to restrict `dat_panel` as well as `dat_ld` to the main observation period.
+
+```{r dev="svg"}
+#< fill_in
+#
+#dat_ld_1980_2000 <- dat_ld %>% ___(period == "1980_2000")
+#
+#dat_panel_1980_2000 <- dat_panel %>% filter(year>= ___ & year<= ___& county %in% dat_ld_1980_2000$county)
+#>
+
+dat_ld_1980_2000 <- dat_ld %>% filter(period == "1980_2000")
+
+dat_panel_1980_2000 <- dat_panel %>% filter(year>= 1980 & year<= 2000 & county %in% dat_ld_1980_2000$county)
+```
+
+In the next task we will calculate the regression from chapter 2.2 with the panel data again. As well as the regression with the long differences from chapter 2.3. Press `check` to save the regression results in `reg_panel_1980_2000` and `reg_ld_1980_2000`.
+
+```{r "3 a) 3",warning=FALSE}
+#< task
+
+reg_panel_1980_2000 = felm(log_corn ~ gdd_lo + gdd_hi + prec_lo + prec_hi| year + county |0|state,data = dat_panel_1980_2000, 
+                           weight = dat_panel_1980_2000$corn_area)
+
+reg_ld_1980_2000 = felm(log_corn ~ gdd_lo + gdd_hi + prec_lo + prec_hi|state|0|state,data = dat_ld_1980_2000, 
+                        weight = dat_ld_1980_2000$corn_area)
+
+#>
+```
+
+Press `check` on the next task to compare the regression results in a table.  
+
+```{r "3 a) 4", results='asis'}
+#< task
+stargazer(reg_panel_1980_2000, reg_ld_1980_2000,
+          model.names     = FALSE,
+          model.numbers   = FALSE,
+          type = "html",
+          digits = 5,
+          column.labels   = c("Panel", "LD"),
+          omit            = c("Constant"),
+          omit.stat       = c("f","ser"))
+#>
+```
+<p></p>
+<p></p>
+#< quiz ""
+
+question: Which of the explanatory variables in the table above is of interest, for calculating the adaptation to extreme heat?
+
+sc:
+    - gdd_lo, the interval for growing degree days between 0°C and 29°C.
+    - gdd_hi, the interval for growing degree days above 29°C.*
+    - prec_lo, the total precipitation per year equal or lower than 42 cm.
+    - prec_hi, the total precipitation per year higher than 42 cm. 
+   
+success: Correct.
+failure: Try again
+#>
+<p></p>
+<p></p>
+We want to investigate whether farmers adapt to the negative effects of climate change. The explanatory variable for extreme heat `gdd_hi` has a significant negative effect on corn production in both panel regression and long difference regression. Total precipitation above 42cm `prec_hi` has a negative estimator when regressed with panel data but is not significant and has a positive impact when calculated with the long differences. Since the estimator $\hat\beta_{2}^{LD}$ is smaller than $\hat\beta_{2}^{P}$ we can assume that the negative impact of extreme heat was reduced in the long run. Let's calculate the percentage of extreme heat that was offset in the longer run with our measure of adaptation.
+
+$$1- \frac{\hat\beta_{2}^{LD}}{\hat\beta_{2}^{P}}$$
+Therefore fill in the missing code in the next task.
+
+```{r "3 a) 5"}
+#< task
+
+adapt <- (1- summary(reg_ld_1980_2000)$coefficients[2, 1]/summary(reg_panel_1980_2000)$coefficients[2, 1])
+adapt
+
+#>
+```
+
+We obtain a value of about 0.09 for the adaption measure, which implies that in the long run 9% of the negative short term effects of extreme heat are mitigated by farmer adaptations. It should be kept in mind though, that we calculated the farmer adjustment based on one observed value for the estimates $\hat\beta_{2}^{LD}$ and $\hat\beta_{2}^{P}$. Unfortunately, we cannot comment on the accuracy of our result for the adaption measure because the distribution to our measure is unknown. To overcome this problem, we will recalculate the adaptation measure by using bootstrap data in the next section. 
+
+<p></p>
+<p></p>
+### The Bootstrap Method
+
+Burke & Emerick (2005) determined 1000 bootstrap replications of $\hat\beta_{2}^{P}$ and $\hat\beta_{2}^{LD}$. Bootstrapping is a statistical procedure in which many samples are redrawn from a sample, from which statistics such as mean or standard deviation are calculated. In this way, the accuracy of estimates for parameters can be determined. (Efron & Tibshironi (1994), p.3-7) We will now go through the bootstrap procedure step by step. We are taking the panel data set of 31.724 observed values as an example. The bootstrapping procedure is shown in the figure below, which is based on Efron & Tibshironi (1994) p.13. The first bootstrap data set $\mathcal{X}^{*1}$ is created by drawing states with replacement from the panel data set. Now we can estimate the bootstrap estimator $\hat\beta_{2}^{P}\mathcal{X}^{*1}$ by computing the regression with the bootstrap panel data set $\mathcal{X}^{P*1}$. These steps are repeated 1000 times.
+<p></p>
+<p></p>
+<center>
+![Figure 1](Figure1.JPG)
+</center>
+<p></p>
+<p></p>
+
+#< quiz "number of observations"
+
+question: How many observation values n will each Panel bootstrap data set $\mathcal{X}^{*}$ have?
+sc:
+    - n = 31.724*
+    - n = 1000
+    
+success: Correct!
+failure: Try again.
+#>
+
+
+#< quiz "number of bootstrap replications"
+
+question: How many bootstrap replications of $\hat\beta_{2}^{P}$ are calculated?
+sc:
+    - n = 40762
+    - n = 1000*
+    
+success: Correct!
+failure: Try again.
+#>
+
+Press `check` in the next task to load the already calculated  bootstrap replications of $\hat\beta_{2}^{P}$ for the main observation period 1980-2000. 
+
+```{r "3 a) 6"}
+#< task
+boot_panel= read_dta("boot_panel.dta")
+boot_panel_main <- boot_panel %>%
+                   filter(period == "1980_2000")
+
+head(boot_panel_main)
+#>
+```
+
+Check if the record `boot_panel_main` has the 1000 repetitions of $\hat\beta_{2}^{P}$ by counting the rows of the record with `count`. Provide the missing function in the next task. 
+
+```{r dev="svg"}
+#< fill_in
+#___(boot_panel_main)
+#>
+count(boot_panel_main)
+```
+
+Press `check` to load the equivalent bootstrap record for the long difference replications with the next task. 
+
+```{r "3 a) 7"}
+#< task
+
+boot_ld= read_dta("boot_ld.dta")
+boot_ld_main <- boot_ld %>%
+                filter(period == "1980_2000")
+count(boot_ld_main)
+#>
+```
+
+There are also 1000 bootstrap replications of $\hat\beta_{2}^{LD}$ in data set `boot_ld_main`. By bootstrapping the data, we now have more observations to measure the farmer adaptation to extreme heat. Which allows us to recalculate the adaptation measure $1-\hat\beta_{2}^{LD}/\hat\beta_{2}^{P}$ again for each bootstrap replication. In the next task, complete the formula for calculating the measure of adaptation.
+
+```{r dev="svg"}
+#< fill_in
+#adapt_main <- boot_ld_main %>% 
+#              mutate(replicate = replicate,
+#                     adapt     = ___-(___/boot_panel_main$beta2))%>% 
+#              select(replicate, adapt)
+#>
+
+adapt_main <- boot_ld_main %>% 
+              mutate(replicate = replicate,
+                     adapt     = 1-(beta2/boot_panel_main$beta2))%>% 
+              select(replicate, adapt)
+```
+
+In the data set `adapt_main` we now calculated the percentage of adaptation with the variable `adapt` and in the variable `replicate` we specified the respective bootstrap iteration from which the data was taken. In the next task we will calculate the minimum, maximum and mean value of the variable `adapt`. Complete the missing code in the following task to calculate these values.
+
+```{r dev="svg"}
+#< fill_in
+#statistic <- adapt_main %>% 
+#             summarise(min  = ___(adapt),
+#                       mean = ___(adapt),
+#                       max  = ___(adapt),
+#                        sd   = sd(adapt))
+#head(statistic)
+#>
+
+statistic <- adapt_main %>% 
+             summarise(min  = min(adapt),
+                       mean = mean(adapt),
+                       max  = max(adapt),
+                       sd   = sd(adapt))
+head(statistic)
+```
+
+To visualize the frequency distribution of `adapt`, we create a histogram with the next task.
+
+```{r "3 a) 8"}
+#< task
+ggplot(adapt_main, aes(adapt)) +
+  geom_histogram(aes(y = ..density..), color = "#000000", fill = "darkgrey",binwidth = 0.05) +
+  geom_density(color = "#000000", fill = "dodgerblue4", alpha = 0.6)+
+  ylab("Frequency distribution")+
+  xlab("Adaptation measure")+ 
+  geom_vline(xintercept=statistic$mean)+
+  geom_text(aes(x=statistic$mean, label= "Mean:   0.22", y=3))+
+  geom_text(aes(x=statistic$min,  label= "  Min: -0.57", y=3))+
+  geom_text(aes(x=statistic$max,  label= "Max: 1.44   ", y=3))+
+  geom_text(aes(x=statistic$max,  label= "Sd:  0.22    ",  y=2.5))
+#>
+```
+
+To display the adaptation measure as a histogram the variable `adapt` is divided into bins with a width of 0.05, in which the number of observation values are counted. In addition, the function `geom_density` returns a smooth version of the frequency distribution in blue. It can be seen here that the adaptation measure is normally distributed with a mean of about 0.22 and a standard deviation of 0.22. The mean indicates that on average 22% of the short-run negative effects, are mitigated by farmer adjustments, over the long run. However, we can also see that the distribution spans over 0, which indicates that no adaptation to extreme heat has taken place. We construct a one sided p-value to test the null hypothesis:
+
+$$H_{0}: No \ Adpatation \ to \ extreme \ heat \ in \ the \ long \ run $$
+$$H_{1}: Adaption \ to \ extreme \ heat \ in \ the \ long \ run $$
+
+In the next task the left bounded values <0 are added up and divided by the total number of observed values. 
+
+```{r "3 a) 9",warning=FALSE}
+#< task
+adapt_main<- adapt_main %>%
+             mutate(p=round(sum(adapt<0)/n(),2))
+unique(adapt_main$p)
+#>
+```
+
+This gives us a p-value of 0.14. Thus, we cannot reject the null hypothesis that no adaptation to extreme heat has occurred in the long run. 
+
+
+
+### Comparison with other periods
+
+We conclude this chapter by calculating the measure of adaptation using additional time periods and comparing them with the results for the main period 1980-2000. Run the following code, which calculates the adaptation measure for each period with the bootstrap replications.
+
+```{r "3 a) 10",warning=FALSE}
+#< task
+adapt_1 <- boot_ld %>% 
+                mutate(replicate = replicate,
+                       period = period,
+                       adapt = 1-(beta2/boot_panel$beta2))
+adapt_2 <- adapt_1%>%
+                mutate(period="combined")
+
+adapt <- rbind(adapt_1,adapt_2)
+unique(adapt$period)
+#>
+```
+
+We now have five periods with different lengths between 20, 25 and 30 years plus the period combined, where all the results of the other periods are merged. We again calculate the p-value for each of these periods to test the null hypothesis that no adjustment occurred. Just run the code below.
+
+```{r "3 a) 11",warning=FALSE}
+#< task
+adapt<- adapt %>%
+            group_by(period)%>%
+            mutate(p=round(sum(adapt<0)/n(),2))%>%
+            ungroup()
+
+#>
+```
+
+To compare the different time periods, we will plot the distribution of the measure of adaptation in a boxplot for each period. The function `geom_boxplot`, allows us to display multiple boxplots in one plot. Press `check` to visualize the distributions of the adaptation measure. 
+
+```{r "3 a) 12"}
+#< task
+ggplot(adapt, aes(x = period))+ 
+      geom_boxplot(aes(y = adapt), 
+                   width = 0.8)+  
+      geom_text(data = adapt%>%
+                       group_by(period)%>%
+                       summarise(y = max(adapt), 
+                                 p = max(p)),
+                aes(x     = period,
+                    y     = -2,
+                    label = p), 
+                    size  = 4)+
+      ylab("Distribution of the Adaption Measure")+
+      xlab("Period")+ 
+      coord_flip()
+
+#>
+```
+
+For more information about the statistics of a boxplot, see the infobox `Statistics of a Boxplot` below.
+
+#< info "Statistics of a Boxplot"
+
+A box plot, also known as a box-and-whisker plot, is a diagram showing the distribution of the values of at least one variable. In the plot the five-point summary is displayed graphically for each variable. Included are:
+
+-	the median, drawn by a line inside the box
+- the interquartile range $IQR=Q3-Q1=Q_{p=0.75}-Q_{p=0.25}$, represented as a box
+     - lower quartil $Q_{p=0.25}$ 25% of the values are smaller or equal than the lower quartil
+     - upper quartil $Q_{p=0.75}$ 75% of the values are smaller or equal than the upper quartil
+-	the upper and lower whiskers which are 1.5 times the length of the IQR, shown as lines right and left to the box
+- the outliers which are values outside of the whiskers, shown as dots
+
+#>
+
+
+Except for the main observation period 1980-2000, all interquartile ranges contain negative values. Here we can see when calculating the adaptation measure with other observation periods than 1980-2000, fewer negative effects by extreme heat were weakened over the long run by adaptation. In addition, all whiskers range over zero and we can't reject with the p-values that there were no adaption to extreme heat. 
+ 
+
+## Exercise 3.2 -- Adaptation to other margins
+
+In the last Exercise 3.1, we focused on whether farmers responded to the negative effects of heat by adapting the corn production, such as planting more heat-resistant corn varieties. However, it could be that farmers are responding to climate change in other ways. In this Exercise, we want to see if farmers respond to the negative impact of extreme heat by switching to a different crop or leaving the market altogether. To observe this, we take additional measures of productivity, which were obtained by the United States Department of Agriculture (USDA).
+
+Press `edit` and `check` to load the data with the following task. 
+
+```{r "4 a) 1", warning=FALSE}
+#< task
+farm_1980= read_dta("farm_1980.dta")
+
+farm_2000= read_dta("farm_2000.dta")
+
+head(farm_2000)
+#>
+```
+
+The data sets `farm_1980` and `farm_2000` have the same structure and variables. The data are listed at the county level. The column `farm_num_log` shows the logarithmized number of farms. The variable `farm_acres_log` is the log area which is used as farm land. The variable `corn_share` is the percentage of corn area compared to the total crop area. The absolute value of corn acres is given in `corn_area` and the total population of a county is shown in the variable `pop`. 
+
+When performing the next task, the differences of the variables described above, between the years 1980 and 2000 are formed and saved in the data frame `farm`.
+
+```{r "4 a) 3"}
+#< task
+farm <- farm_2000 %>%
+  mutate(num_farms  = farm_num_log   - farm_1980$farm_num_log,
+         farm_area  = farm_acres_log - farm_1980$farm_acres_log,
+         corn_area  = log(corn_area) - log(farm_1980$corn_area),
+         corn_share = corn_share     - farm_1980$corn_share,
+         population = log(pop)       - log(farm_1980$pop))%>%
+  select(county,num_farms, farm_area,corn_area,corn_share,population)
+
+head(farm)
+#>
+```
+
+The reason for calculating the differences is is the following. We want to calculate a regression model with long differences again but this time the dependent variable should not be the corn production.  Instead, the variables in the data set `farm` will each be a dependent variable in a regression model. Of course, we also need explanatory variables which are the long differences from chapter 2.3. Press `check` to load the long difference data. 
+
+```{r "4 a) 4"}
+#< task
+dat_ld= read_dta("ld_1980_2000.dta")
+
+head(dat_ld)
+#>
+```
+
+The data set `dat_ld` is trimmed down to only the variables we need in this exercise. The percentage of time added to an annual value for temperatures above 0°C to 29°C is given in `gdd_lo` and in `gdd_hi` for temperatures above 29°C. In simple terms, the variable `prec_lo` was assigned the total precipitation in cm if it was less or equal to 42 cm and otherwise it was assigned to the variable `prec_hi`. `farm_area_1980` is a new variable, which indicates the total agricultural area in the year 1980 in acres. In the next task, we merge the two data sets `dat_ld` and `farm` to simplify the call of the variables in the regression function. 
+
+```{r "4 a) 5"}
+#< task
+dat <- merge(dat_ld, farm, by ="county")
+
+head(dat)
+#>
+```
+
+We recall the already discussed regression model from chapter 2.3 with the explanatory variables `gdd_lo`, `gdd_hi`, `prec_lo` and `prec_hi` which is now varying in the dependent variable $\vartriangle y_{is}$. 
+
+$$\vartriangle y_{is}= \vartriangle \beta_{1} \ gdd\_lo_{is}+\vartriangle \beta_{2} \ gdd\_hi_{is}+\vartriangle \beta_{3} \ prec\_lo_{is}+\vartriangle \beta_{4} \ prec\_hi_{is} + \alpha_{s} + \vartriangle u_{is}$$
+
+We have now five dependent variables: `corn_area`, `corn_share`, `farm_area`, `num_farms` and `pop`. Press `check` in the next task to run for each dependent variable a regression. 
+
+```{r "4 a) 6",warning=FALSE}
+#< task
+reg_corn_area <- felm(corn_area ~ gdd_lo + gdd_hi + prec_lo + prec_hi|state|0|state,data = dat, weight = dat$farm_area_1980)
+
+
+reg_corn_share <- felm(corn_share ~ gdd_lo + gdd_hi + prec_lo + prec_hi|state|0|state,data = dat, weight = dat$farm_area_1980)
+
+
+reg_farm_area <- felm(farm_area ~ gdd_lo + gdd_hi + prec_lo + prec_hi|state|0|state,data = dat, weight = dat$farm_area_1980)
+
+
+reg_num_farm <- felm(num_farms ~ gdd_lo + gdd_hi + prec_lo + prec_hi|state|0|state,data = dat, weight = dat$farm_area_1980)
+
+
+reg_pop <- felm(population ~ gdd_lo + gdd_hi + prec_lo + prec_hi|state|0|state,data =dat, weight = dat$farm_area_1980)
+
+#>
+```
+
+By running the code below the regression results are shown in one table.
+
+```{r "4 a) 7", results='asis'}
+#< task
+stargazer(reg_corn_area, reg_corn_share,reg_farm_area,reg_num_farm,reg_pop,
+          model.names = FALSE,
+          model.numbers=FALSE,
+          dep.var.labels.include = FALSE,
+          #out= "regression.html",
+          type='html',
+          digits=5,
+          column.sep.width = "16pt",
+          column.labels=c("Corn area  ", "Corn share  ", "Farm area  ", "Num. farms  ", "Population  "),
+          omit = c("Constant"),
+          omit.stat = c("f","ser"))
+
+#>
+```
+
+Columns 1-2 show if farmers adapt to extreme heat by reducing corn area or changing to other crops. In column 1 with corn area as dependent variables we don't have significant estimators. But in column 2 where `corn_share` is the response variable, we can see that `gdd_hi` is significant at the 5%-level. Hence, we interpret the result as follows. A one unit increase in growing degree days above 29°C reduces the corn share by 9.2%. An adaption to extreme heat could be the switching from corn to another crop. Columns 3-5 examine whether farmers have left the market altogether, in response to the negative impacts of global warming. However, the estimator for extreme heat is not significant for columns 3-5, which means that we cannot reject the null hypothesis, that the relationship between `gdd_hi` and the dependent variables farm area, number of farms, and population is due to chance.
+
+
+
+## Exercise 4 -- Conclusion
+
+In this R-Tutor set, we examined whether farmers are adapting to climate change. The problem set started with an introduction to the used data. To gain insight into the panel data, trends in climate and corn production were presented over the 1950-2000 observation period. By visualizing the data, we saw a clear positive trend in the corn production over the years 1950-2000. Some states more than tripled their corn production over the observed period. Then we observed the change in average temperature between the years 1980 and 2000 by calculating the difference between those years. The results were presented in a heatmap, showing that some counties warmed by up to 1.5 °C while other counties cooled.
+
+A regression model was set up for the main observation period 1980-2000 to calculate the impact of temperature on corn production. Thereby we could find a non-linear relationship between them. This relationship has been accounted for by using a piecewise regression. The regression model was then stepwise adjusted to obtain unbiased estimators by the model. Here, the omitted variable bias was discussed in detail and additional control variables to solve the endogeneity problem were presented, such as adding fixed effects and weighting. The final regression model was able to estimate the short-term negative impact of extreme heat with the panel data. We observed that a one unit increase in growing degree days above 29°C resulted in a 5.48% reduction in corn production. Finally, we calculated a regression model with long differences as data, to observe the long-term negative effects of temperatures above 29°C. We obtained an estimator for the growing degree days above 29°C of -0.052. This can be interpreted as follows: One unit of growing degree days above 29°C leads to a 5.2% decrease in corn production in the long term.
+
+Subsequently a measure of adaptation was constructed with the panel and long differences estimators $\hat\beta_{2}^P$ and $\hat\beta_{2}^LD$ for extreme heat. In addition, a bootstrap method was used to obtain a distribution for $\hat\beta_{2}^P$ and $\hat\beta_{2}^LD$ to quantify the result of the adaptation measure. Using the resulting distribution, we could calculate an average long-term adjustment for the negative short-term impact of extreme heat of 22%. The adaptation measure was designed to see whether farmers respond directly to the negative effects of heat in their corn production. For example, by switching to more heat-resistant corn varieties. Then we considered that farmers could adapt in other ways, like switching to another crop or leaving the market altogether. Here, it was seen that when the growing degree days above 29°C increased by one unit, the share of corn decreased by 0.09% and farmers switched to another crop.
+
+
+
+## Exercise References
+
+
+### Bibliography
+
+
+- Burke, M., & Emerick, K. (2016). Adaptation to climate change: Evidence from US agriculture. American Economic Journal: Economic Policy, 8(3), 106-40.
+
+- Economic Research Service. Feedgrains Sector at a Glance. U.S. Department of Agriculture (USDA). 28.06.2021. https://www.ers.usda.gov/topics/crops/corn-and-other-feedgrains/feedgrains-sector-at-a-glance/
+
+- Efron, B., & Tibshirani, R. J. (1994). An introduction to the bootstrap. CRC press.
+
+- Erda, L., Wei, X., Hui, J., Yinlong, X., Yue, L., Liping, B., & Liyong, X. (2005). Climate change impacts on crop yield and quality with CO2 fertilization in China. Philosophical Transactions of the Royal Society B: Biological Sciences, 360(1463), 2149-2154.
+
+- Environmental Working Group. USDA subsidies in the United States totaled $424.4 billion from 1995-2020. https://farm.ewg.org/progdetail.php?fips=00000&progcode=total&page=states&regionname=theUnitedStates. Retrieved 16.04.2020
+
+- Hansen, J., Sato, M., Ruedy, R., Lo, K., Lea, D. W., & Medina-Elizade, M. (2006). Global temperature change. Proceedings of the National Academy of Sciences, 103(39), 14288-14293.
+
+- Hastie, T., Tibshirani, R., Friedman, J. H., & Friedman, J. H. (2009). The elements of statistical learning: data mining, inference, and prediction (Vol. 2, pp. 1-758). New York: springer.
+
+- Kennedy, P. (2008). A guide to econometrics. John Wiley & Sons.
+
+- Saavoss, M., Capehart, T., McBride, W., & Effland, A. (2021). Trends in Production Practices and Costs of the US Corn Sector (No. 1962-2021-2205).
+
+- Sánchez, B., Rasmussen, A., & Porter, J. R. (2014). Temperatures and the growth and development of maize and rice: a review. Global change biology, 20(2), 408-417.
+
+- Schlenker, W., & Roberts, M. J. (2009). Nonlinear temperature effects indicate severe damages to US crop yields under climate change. Proceedings of the National Academy of sciences, 106(37), 15594-15598.
+
+- Solon, G., Haider, S. J., & Wooldridge, J. M. (2015). What are we weighting for?. Journal of Human resources, 50(2), 301-316.
+
+- Taylor, R. A. J., Herms, D. A., Cardina, J., & Moore, R. H. (2018). Climate change and pest management: unanticipated consequences of trophic dislocation. Agronomy, 8(1), 7.
+
+- Toms, J. D., & Lesperance, M. L. (2003). Piecewise regression: a tool for identifying ecological thresholds. Ecology, 84(8), 2034-2041.
+
+- Wooldridge, J. M. (2015). Introductory econometrics: A modern approach. Cengage learning.
+
+
+
+### R Packages
+
+- Auguie, B. and Antonov, A. (2017). gridExtra: *Miscellaneous Functions for ``Grid'' Graphics.* Version 2.3.  https://cran.r-project.org/web/packages/gridExtra/gridExtra.pdf
+
+- Becker, A. R., Wilks, R. A., Brownrigg, R., Minka, P. T. and Deckmyn, A. (2021). maps: *Draw Geographical Maps* Version 3.4.0
+
+- Gaure, S. (2021). lfe: *Linear Group Fixed Effects.* Version 2.8-7.1. https://cran.r-project.org/web/packages/lfe/lfe.pdf
+
+- Hlavac, M. (2022). stargazer: *Well-Formatted Regression and Summary Statistics Tables.* Version 5.2.3. https://cran.r-project.org/web/packages/stargazer/stargazer.pdf
+
+- Kranz, S. (2020). RTutor: Interactive R problem sets with automatic testing of solutions and automatic hints. Version 2020.11.25
+https://github.com/skranz/RTutor
+
+- Wickham, H., Chang, W., Henry, L., Pedersen, T. L., Takahashi, K., Wilke, C., Woo, K., Yutani, H. and Dunnington, D. (2021). ggplot2: *Create Elegant Data Visualisations Using the Grammar of Graphics.* Version 3.3.5. https://cran.r-project.org/web/packages/ggplot2/ggplot2.pdf
+
+- Wickham, H., François, R., Henry, L. and Müller, K. (2022). dplyr: *A Grammar of Data Manipulation* Version 1.0.8. https://cran.r-project.org/web/packages/dplyr/dplyr.pdf
+
+- Wickham, H. and Mille,r E. (2021). haven: *Import and Export 'SPSS', 'Stata' and 'SAS' Files.* Version 2.4.3. https://cran.r-project.org/web/packages/haven/haven.pdf
+
+- Wickham, H. (2022). tidyr: *Tidy Messy Data.* Version 1.2.0. https://cran.r-project.org/web/packages/tidyr/tidyr.pdf
+
+- Yutani, H. (2021). gghighlight: *Highlight Lines and Points in 'ggplot2'.* Version 0.3.2. https://cran.r-project.org/web/packages/gghighlight/gghighlight.pdf
+
