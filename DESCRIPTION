@@ -2,9 +2,9 @@ Package: RTutorClimateChange
 Type: Package
 Title: RTutor problem set RTutorClimateChange
 Version: 0.1
-Date: 2022-23-04
+Date: 2022-20-04
 Author: Vera Lang
-Maintainer: Vera Lang <author@email.net>
+Maintainer: Vera Lang <vera.lang@web.de>
 Description: RTutor problem set RTutorClimateChange
 License: Not yet licensed by the author. The default suggestion for licensing is
 	Problem set content: Creative Commons (CC BY-SA)
